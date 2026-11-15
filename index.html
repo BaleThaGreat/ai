@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#090d18">
+  <title>MULTI-BRAIN AI</title>
+  <style>
+    :root { color-scheme: dark; --bg:#090d18; --panel:#121a2b; --line:#26334b; --muted:#9aa9c2; --text:#f4f7ff; --blue:#7c9cff; --green:#6ee7b7; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:radial-gradient(circle at top,#182447 0,#090d18 48%); color:var(--text); font:16px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; min-height:100vh; }
+    main { width:min(920px,100%); margin:auto; padding:26px 16px 60px; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:22px; }
+    h1 { font-size:clamp(25px,6vw,38px); letter-spacing:.04em; margin:0; }
+    .sub { color:var(--muted); margin-top:7px; font-size:14px; }
+    .pill { border:1px solid #285b4d; color:var(--green); border-radius:999px; padding:7px 10px; font-size:12px; white-space:nowrap; }
+    .panel { background:rgba(18,26,43,.92); border:1px solid var(--line); border-radius:18px; padding:17px; margin:14px 0; box-shadow:0 12px 34px #0003; }
+    label { display:block; font-weight:650; margin-bottom:10px; }
+    textarea { width:100%; min-height:130px; resize:vertical; border:1px solid #35445f; border-radius:13px; background:#0b1221; color:var(--text); padding:14px; font:inherit; line-height:1.5; }
+    button { width:100%; border:0; border-radius:13px; padding:14px 18px; margin-top:12px; background:linear-gradient(100deg,#6688ff,#8b5cf6); color:white; font-size:16px; font-weight:750; }
+    button:disabled { opacity:.55; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .card { min-width:0; background:#0d1525; border:1px solid var(--line); border-radius:14px; padding:14px; }
+    .card h3 { margin:0 0 10px; font-size:15px; color:#c9d6ff; }
+    .content { white-space:pre-wrap; overflow-wrap:anywhere; color:#e5eaf5; line-height:1.55; font-size:14px; }
+    .muted { color:var(--muted); font-size:13px; }
+    .error { color:#fca5a5; }
+    .hidden { display:none; }
+    .status { color:var(--muted); font-size:13px; margin-top:10px; }
+    footer { color:var(--muted); font-size:12px; line-height:1.5; padding:8px 2px; }
+    @media(max-width:640px) { .grid { grid-template-columns:1fr; } header { align-items:flex-start; flex-direction:column; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>🧠 MULTI-BRAIN AI</h1>
+      <div class="sub">Two models. One debate. A clearer final answer.</div>
+    </div>
+    <span class="pill">AI DEBATE MODE</span>
+  </header>
+
+  <section class="panel">
+    <label for="prompt">What should the AIs discuss?</label>
+    <textarea id="prompt" maxlength="6000" placeholder="Ask a question or describe a problem..."></textarea>
+    <button id="run">⚡ RUN AI DEBATE</button>
+    <div id="status" class="status">Your API credentials stay on the server.</div>
+  </section>
+
+  <section id="results" class="hidden">
+    <div class="panel">
+      <h2>Round 1 · Independent answers</h2>
+      <div id="initial" class="grid"></div>
+    </div>
+    <div class="panel">
+      <h2>Round 2 · Cross-review</h2>
+      <div id="critiques" class="grid"></div>
+    </div>
+    <div class="panel">
+      <h2>🏆 Final combined answer</h2>
+      <div id="final" class="content"></div>
+    </div>
+  </section>
+  <footer>
+    AI responses can be inaccurate. Verify important information independently.
+    API usage may incur provider charges or be subject to free-tier limits.
+  </footer>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+function card(item) {
+  const failed = item.error;
+  return `<article class="card"><h3>${esc(item.provider)}</h3><div class="content ${failed ? "error" : ""}">${esc(failed || item.text || "No response")}</div></article>`;
+}
+$("run").addEventListener("click", async () => {
+  const prompt = $("prompt").value.trim();
+  if (prompt.length < 3) { $("status").textContent = "Please enter a longer question."; return; }
+  $("run").disabled = true;
+  $("status").textContent = "The models are thinking and reviewing each other…";
+  $("results").classList.add("hidden");
+  try {
+    const res = await fetch("/api/debate", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({prompt})
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Request failed.");
+    $("initial").innerHTML = data.initial_answers.map(card).join("");
+    $("critiques").innerHTML = data.critiques.length
+      ? data.critiques.map(card).join("")
+      : '<p class="muted">Cross-review was skipped because one provider was unavailable.</p>';
+    $("final").innerHTML = `<div class="content ${data.final.error ? "error" : ""}">${esc(data.final.error || data.final.text || "No final answer")}</div>`;
+    $("results").classList.remove("hidden");
+    $("status").textContent = "Debate complete.";
+  } catch (err) {
+    $("status").textContent = err.message;
+  } finally {
+    $("run").disabled = false;
+  }
+});
+</script>
+</body>
+</html>
